@@ -4,7 +4,7 @@ import { Play, ListTodo, Bot } from 'lucide-react'
 import StreakDisplay from '../components/analytics/StreakDisplay'
 
 export default function Dashboard() {
-  const { user } = useAuth()
+  const { user: _user } = useAuth()
   const navigate = useNavigate()
 
   const mainFeatures = [

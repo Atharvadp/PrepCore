@@ -15,13 +15,11 @@ export default function FocusSession() {
   const navigate = useNavigate()
   const [sessionState, setSessionState] = useState<SessionState>('setup')
   const [duration, setDuration] = useState(25)
-  const [taskId, setTaskId] = useState<string | null>(null)
   const [taskTitle, setTaskTitle] = useState<string | undefined>(undefined)
   const [sessionId, setSessionId] = useState<string | null>(null)
 
   const handleStartSession = async (selectedDuration: number, selectedTaskId: string | null) => {
     setDuration(selectedDuration)
-    setTaskId(selectedTaskId)
 
     // Fetch task title if task is selected
     if (selectedTaskId) {
@@ -76,7 +74,7 @@ export default function FocusSession() {
         .single()
 
       if (profile) {
-        const { newStreak, shouldReset } = calculateStreak(
+        const { newStreak } = calculateStreak(
           profile.last_study_date,
           profile.current_streak
         )
