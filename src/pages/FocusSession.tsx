@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../contexts/AuthContext'
 import { calculateStreak, getTodayDate } from '../utils/streakCalculator'
@@ -110,8 +111,24 @@ export default function FocusSession() {
     navigate('/dashboard')
   }
 
+  const handleBackClick = () => {
+    navigate('/dashboard')
+  }
+
   return (
-    <>
+    <div className="min-h-screen bg-gradient-to-br from-calm via-blue-50 to-indigo-50 relative">
+      {/* Back button - only show during setup */}
+      {sessionState === 'setup' && (
+        <button
+          onClick={handleBackClick}
+          className="absolute top-6 left-6 p-2 bg-white/80 hover:bg-white rounded-lg transition-all shadow-sm z-10 flex items-center gap-2 text-gray-700 hover:text-gray-900"
+          aria-label="Back to dashboard"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span className="text-sm font-medium">Back</span>
+        </button>
+      )}
+
       {sessionState === 'setup' && <SessionSetup onStartSession={handleStartSession} />}
       {sessionState === 'active' && (
         <SessionTimer
@@ -128,6 +145,6 @@ export default function FocusSession() {
           onClose={handleCloseSummary}
         />
       )}
-    </>
+    </div>
   )
 }
