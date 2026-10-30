@@ -10,7 +10,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "tsx --test test/auth.test.ts test/tasks.test.ts test/studySessions.test.ts test/streak.test.ts test/ai.test.ts"
+    "test": "tsx --test test/auth.test.ts test/tasks.test.ts test/studySessions.test.ts test/streak.test.ts test/ai.test.ts test/csrf.test.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

@@ -12,6 +12,7 @@ import { aiRoutes } from './routes/aiRoutes.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import { HttpError } from './middleware/httpError.js'
 import { notFound } from './middleware/notFound.js'
+import { createCsrfProtection } from './middleware/csrfProtection.js'
 
 export const app = express()
 
@@ -29,6 +30,7 @@ app.use(
     },
   }),
 )
+app.use(createCsrfProtection(config.corsOrigins, config.nodeEnv === 'production'))
 app.use(express.json({ limit: '100kb' }))
 app.use(cookieParser())
 

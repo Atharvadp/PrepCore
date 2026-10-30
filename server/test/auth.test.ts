@@ -6,6 +6,11 @@ import { after, before, test } from 'node:test'
 import mongoose from 'mongoose'
 import { app } from '../src/app.js'
 import { connectToDatabase } from '../src/config/database.js'
+import { config } from '../src/config/env.js'
+import {
+  authCookieOptions,
+  getAuthCookieBaseOptions,
+} from '../src/middleware/auth.js'
 import { UserModel } from '../src/models/user.model.js'
 
 const email = `auth-test-${randomUUID()}@example.test`
@@ -75,7 +80,11 @@ test('auth endpoints validate credentials, protect /me, and revoke logout tokens
   assert.equal('passwordHash' in signupBody.user, false)
   const signupCookie = signup.headers.get('set-cookie') ?? ''
   assert.equal(/HttpOnly/i.test(signupCookie), true)
-  assert.equal(/SameSite=Lax/i.test(signupCookie), true)
+  assert.equal(
+    new RegExp(`SameSite=${config.nodeEnv === 'production' ? 'None' : 'Lax'}`, 'i').test(signupCookie),
+    true,
+  )
+  assert.equal(new RegExp(`Secure`, 'i').test(signupCookie), config.nodeEnv === 'production')
   assert.equal(/Path=\/api/i.test(signupCookie), true)
   const signupCookiePair = signupCookie.split(';', 1)[0]
   assert.equal(signupCookiePair.startsWith('prepcore_token='), true)
@@ -134,4 +143,20 @@ test('auth endpoints validate credentials, protect /me, and revoke logout tokens
     headers: { cookie: loginCookie },
   })
   assert.equal(loggedOut.status, 401)
+})
+
+test('auth cookie options retain secure attributes for production and local development', () => {
+  assert.deepEqual(getAuthCookieBaseOptions('production'), {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    path: '/api',
+  })
+  assert.deepEqual(getAuthCookieBaseOptions('development'), {
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax',
+    path: '/api',
+  })
+  assert.equal(authCookieOptions.maxAge, config.authTokenTtlSeconds * 1000)
 })

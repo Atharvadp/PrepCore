@@ -6,6 +6,16 @@ import { HttpError } from './httpError.js'
 
 export const authCookieName = 'prepcore_token'
 
+export function getAuthCookieBaseOptions(nodeEnv: string) {
+  const isProduction = nodeEnv === 'production'
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? ('none' as const) : ('lax' as const),
+    path: '/api',
+  }
+}
+
 export const requireAuthentication: RequestHandler = async (request, response, next) => {
   const token: unknown = request.cookies?.[authCookieName]
   if (typeof token !== 'string' || token.length === 0) {
@@ -49,12 +59,7 @@ export const requireAuthentication: RequestHandler = async (request, response, n
   next()
 }
 
-export const authCookieBaseOptions = {
-  httpOnly: true,
-  secure: config.nodeEnv === 'production',
-  sameSite: 'lax' as const,
-  path: '/api',
-}
+export const authCookieBaseOptions = getAuthCookieBaseOptions(config.nodeEnv)
 
 export const authCookieOptions = {
   ...authCookieBaseOptions,
