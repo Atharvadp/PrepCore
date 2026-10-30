@@ -1,109 +1,139 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { supabase } from '../lib/supabaseClient'
-import { useAuth } from '../contexts/AuthContext'
-import { calculateStreak, getTodayDate } from '../utils/streakCalculator'
+import { apiRequest, getApiErrorMessage } from '../lib/api'
+import type { Task } from '../types'
+import { createStudySessionPayload } from '../utils/sessionDuration'
 import SessionSetup from '../components/session/SessionSetup'
 import SessionTimer from '../components/session/SessionTimer'
 import SessionSummary from '../components/session/SessionSummary'
 
 type SessionState = 'setup' | 'active' | 'summary'
 
+interface CreatedStudySession {
+  id: string
+}
+
+function getBrowserTimeZone(): string | undefined {
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    return timeZone.trim() || undefined
+  } catch {
+    return undefined
+  }
+}
+
 export default function FocusSession() {
-  const { user } = useAuth()
   const navigate = useNavigate()
   const [sessionState, setSessionState] = useState<SessionState>('setup')
-  const [duration, setDuration] = useState(25)
+  const [duration, setDuration] = useState(15)
   const [taskTitle, setTaskTitle] = useState<string | undefined>(undefined)
-  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [taskError, setTaskError] = useState('')
+  const [completionError, setCompletionError] = useState('')
+  const [cancelError, setCancelError] = useState('')
+  const sessionIdRef = useRef<string | null>(null)
+  const startInFlightRef = useRef(false)
+  const completionInFlightRef = useRef(false)
+  const completedRef = useRef(false)
+  const cancellationInFlightRef = useRef(false)
 
   const handleStartSession = async (selectedDuration: number, selectedTaskId: string | null) => {
+    if (startInFlightRef.current) {
+      return
+    }
+    startInFlightRef.current = true
+    setTaskError('')
+    setCompletionError('')
+    setCancelError('')
     setDuration(selectedDuration)
+    setTaskTitle(undefined)
 
-    // Fetch task title if task is selected
-    if (selectedTaskId) {
-      const { data } = await supabase
-        .from('tasks')
-        .select('title')
-        .eq('id', selectedTaskId)
-        .single()
-      setTaskTitle(data?.title)
-    }
-
-    // Create session in database
-    const { data, error } = await supabase
-      .from('study_sessions')
-      .insert([
-        {
-          user_id: user?.id,
-          task_id: selectedTaskId,
-          duration_minutes: selectedDuration,
-          started_at: new Date().toISOString(),
-          completed: false,
-        },
-      ])
-      .select()
-      .single()
-
-    if (!error && data) {
-      setSessionId(data.id)
-      setSessionState('active')
-    }
-  }
-
-  const handleCompleteSession = async () => {
-    // Update session as completed
-    if (sessionId) {
-      await supabase
-        .from('study_sessions')
-        .update({
-          ended_at: new Date().toISOString(),
-          completed: true,
-        })
-        .eq('id', sessionId)
-    }
-
-    // Update streak
     try {
-      // Get current profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('current_streak, longest_streak, last_study_date')
-        .eq('id', user?.id)
-        .single()
-
-      if (profile) {
-        const { newStreak } = calculateStreak(
-          profile.last_study_date,
-          profile.current_streak
+      // Fetch task title if task is selected
+      if (selectedTaskId) {
+        const { task } = await apiRequest<{ task: Task }>(
+          `/tasks/${encodeURIComponent(selectedTaskId)}`,
         )
-
-        const updatedLongestStreak = Math.max(newStreak, profile.longest_streak || 0)
-
-        // Update profile with new streak
-        await supabase
-          .from('profiles')
-          .update({
-            current_streak: newStreak,
-            longest_streak: updatedLongestStreak,
-            last_study_date: getTodayDate(),
-          })
-          .eq('id', user?.id)
+        setTaskTitle(task.title)
       }
-    } catch (error) {
-      console.error('Error updating streak:', error)
-    }
 
-    setSessionState('summary')
+      const timeZone = getBrowserTimeZone()
+      const { session } = await apiRequest<{ session: CreatedStudySession }>(
+        '/study-sessions',
+        {
+          method: 'POST',
+          body: JSON.stringify(
+            createStudySessionPayload(selectedDuration, selectedTaskId, timeZone),
+          ),
+        },
+      )
+      if (!session || typeof session.id !== 'string' || session.id.length === 0) {
+        throw new Error('The server returned an invalid session response.')
+      }
+
+      sessionIdRef.current = session.id
+      setSessionState('active')
+    } catch (error: unknown) {
+      setTaskError(
+        getApiErrorMessage(
+          error,
+          error instanceof Error ? error.message : 'Unable to start the session. Please try again.',
+        ),
+      )
+    } finally {
+      startInFlightRef.current = false
+    }
   }
 
-  const handleCancelSession = async () => {
-    if (sessionId) {
-      await supabase.from('study_sessions').delete().eq('id', sessionId)
+  const handleCompleteSession = useCallback(async () => {
+    const activeSessionId = sessionIdRef.current
+    if (!activeSessionId || completedRef.current || completionInFlightRef.current) {
+      return
     }
-    navigate('/dashboard')
-  }
+
+    completionInFlightRef.current = true
+    setCompletionError('')
+    try {
+      await apiRequest<{ session: CreatedStudySession }>(
+        `/study-sessions/${encodeURIComponent(activeSessionId)}/complete`,
+        { method: 'PATCH' },
+      )
+      completedRef.current = true
+      setSessionState('summary')
+    } catch (error: unknown) {
+      setCompletionError(
+        getApiErrorMessage(error, 'Unable to save session completion. Please retry.'),
+      )
+    } finally {
+      completionInFlightRef.current = false
+    }
+  }, [])
+
+  const handleCancelSession = useCallback(async () => {
+    const activeSessionId = sessionIdRef.current
+    if (cancellationInFlightRef.current) {
+      return
+    }
+
+    cancellationInFlightRef.current = true
+    setCancelError('')
+    try {
+      if (activeSessionId) {
+        await apiRequest<{ message: string }>(
+          `/study-sessions/${encodeURIComponent(activeSessionId)}`,
+          { method: 'DELETE' },
+        )
+      }
+      sessionIdRef.current = null
+      navigate('/dashboard')
+    } catch (error: unknown) {
+      setCancelError(
+        getApiErrorMessage(error, 'Unable to cancel the session. Please retry.'),
+      )
+    } finally {
+      cancellationInFlightRef.current = false
+    }
+  }, [navigate])
 
   const handleCloseSummary = () => {
     navigate('/dashboard')
@@ -125,6 +155,36 @@ export default function FocusSession() {
           <ArrowLeft className="w-5 h-5" />
           <span className="text-sm font-medium">Back</span>
         </button>
+      )}
+
+      {taskError && (
+        <div className="absolute top-20 left-1/2 z-20 w-[min(90%,32rem)] -translate-x-1/2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-700" role="alert">
+          {taskError}
+        </div>
+      )}
+      {completionError && (
+        <div className="absolute top-20 left-1/2 z-[60] w-[min(90%,32rem)] -translate-x-1/2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-700" role="alert">
+          <p>{completionError}</p>
+          <button
+            onClick={() => void handleCompleteSession()}
+            disabled={completionInFlightRef.current}
+            className="mt-2 font-medium underline disabled:opacity-50"
+          >
+            Retry saving session
+          </button>
+        </div>
+      )}
+      {cancelError && (
+        <div className="absolute top-20 left-1/2 z-[60] w-[min(90%,32rem)] -translate-x-1/2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-700" role="alert">
+          <p>{cancelError}</p>
+          <button
+            onClick={() => void handleCancelSession()}
+            disabled={cancellationInFlightRef.current}
+            className="mt-2 font-medium underline disabled:opacity-50"
+          >
+            Retry cancellation
+          </button>
+        </div>
       )}
 
       {sessionState === 'setup' && <SessionSetup onStartSession={handleStartSession} />}

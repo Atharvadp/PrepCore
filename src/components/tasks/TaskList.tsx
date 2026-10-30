@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabaseClient'
-import { useAuth } from '../../contexts/AuthContext'
+import { useCallback, useEffect, useState } from 'react'
+import { apiRequest, getApiErrorMessage } from '../../lib/api'
+import { useAuth } from '../../contexts/useAuth'
 import type { Task } from '../../types'
 import TaskCard from './TaskCard'
 import TaskForm from './TaskForm'
@@ -10,29 +10,32 @@ export default function TaskList() {
   const { user } = useAuth()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all')
 
-  useEffect(() => {
-    fetchTasks()
-  }, [user])
+  const fetchTasks = useCallback(async () => {
+    if (!user) {
+      setTasks([])
+      setLoading(false)
+      return
+    }
 
-  const fetchTasks = async () => {
+    setLoading(true)
+    setLoadError('')
     try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      setTasks(data || [])
-    } catch (err) {
-      console.error('Error fetching tasks:', err)
+      const { tasks: fetchedTasks } = await apiRequest<{ tasks: Task[] }>('/tasks')
+      setTasks(fetchedTasks)
+    } catch (error: unknown) {
+      setLoadError(getApiErrorMessage(error, 'Unable to load tasks. Please try again.'))
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
+
+  useEffect(() => {
+    void fetchTasks()
+  }, [fetchTasks])
 
   const filteredTasks = tasks.filter((task) => {
     if (filter === 'active') return !task.is_completed
@@ -91,7 +94,15 @@ export default function TaskList() {
       </div>
 
       {/* Task List or Empty State */}
-      {filteredTasks.length === 0 ? (
+      {loadError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+          <p>{loadError}</p>
+          <button onClick={() => void fetchTasks()} className="mt-2 font-medium underline">
+            Retry
+          </button>
+        </div>
+      )}
+      {!loadError && filteredTasks.length === 0 ? (
         <div className="text-center py-16 animate-fadeIn">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-calm mb-6">
             <ListTodo className="text-primary" size={40} />
@@ -114,7 +125,7 @@ export default function TaskList() {
             </button>
           )}
         </div>
-      ) : (
+      ) : filteredTasks.length > 0 ? (
         <div className="grid gap-3">
           {filteredTasks.map((task) => (
             <TaskCard
@@ -125,7 +136,7 @@ export default function TaskList() {
             />
           ))}
         </div>
-      )}
+      ) : null}
 
       {/* Task Form Modal */}
       {showForm && (

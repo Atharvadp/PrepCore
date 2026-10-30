@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabaseClient'
-import { useAuth } from '../../contexts/AuthContext'
+import { apiRequest } from '../../lib/api'
+import { useAuth } from '../../contexts/useAuth'
 import { Flame, Award } from 'lucide-react'
 import LoadingSpinner from '../layout/LoadingSpinner'
+import type { Profile } from '../../types'
+
+interface ProfileResponse {
+  profile: Pick<Profile, 'current_streak' | 'longest_streak'>
+}
 
 export default function StreakDisplay() {
   const { user } = useAuth()
@@ -11,27 +16,36 @@ export default function StreakDisplay() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchStreak()
-  }, [user])
+    const controller = new AbortController()
+    setLoading(true)
+    const fetchStreak = async () => {
+      if (!user) {
+        setCurrentStreak(0)
+        setLongestStreak(0)
+        setLoading(false)
+        return
+      }
 
-  const fetchStreak = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('current_streak, longest_streak')
-        .eq('id', user?.id)
-        .single()
-
-      if (error) throw error
-
-      setCurrentStreak(data?.current_streak || 0)
-      setLongestStreak(data?.longest_streak || 0)
-    } catch (error) {
-      console.error('Error fetching streak:', error)
-    } finally {
-      setLoading(false)
+      try {
+        const { profile } = await apiRequest<ProfileResponse>('/profile', {
+          signal: controller.signal,
+        })
+        setCurrentStreak(profile.current_streak)
+        setLongestStreak(profile.longest_streak)
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error('Error fetching streak:', error)
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
+      }
     }
-  }
+
+    void fetchStreak()
+    return () => controller.abort()
+  }, [user])
 
   if (loading) {
     return <LoadingSpinner message="Loading streaks..." />

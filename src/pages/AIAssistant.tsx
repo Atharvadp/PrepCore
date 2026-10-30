@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { askQuestion } from '../lib/groqClient'
+import { askQuestion } from '../lib/aiClient'
 import { Send, Bot, User, Loader, Sparkles } from 'lucide-react'
 
 
@@ -40,7 +40,7 @@ export default function AIAssistant() {
     try {
       const answer = await askQuestion(userMessage)
       setMessages((prev) => [...prev, { role: 'assistant', content: answer }])
-    } catch (error) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         {

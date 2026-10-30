@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
-import { useAuth } from '../contexts/AuthContext'
+import { useCallback, useEffect, useState } from 'react'
+import { apiRequest, getApiErrorMessage } from '../lib/api'
+import { useAuth } from '../contexts/useAuth'
+import type { Task } from '../types'
 import StatCard from '../components/analytics/StatCard'
 import StreakDisplay from '../components/analytics/StreakDisplay'
 import { Clock, Target, TrendingUp, Award } from 'lucide-react'
@@ -14,8 +15,15 @@ interface AnalyticsData {
   thisWeekSessions: number
 }
 
+interface CompletedStudySession {
+  id: string
+  duration_minutes: number
+  started_at: string
+  completed: boolean
+}
+
 export default function Analytics() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [analytics, setAnalytics] = useState<AnalyticsData>({
     totalSessions: 0,
     totalMinutes: 0,
@@ -25,36 +33,32 @@ export default function Analytics() {
     thisWeekSessions: 0,
   })
   const [loading, setLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState('')
 
-  useEffect(() => {
-    fetchAnalytics()
-  }, [user])
+  const fetchAnalytics = useCallback(async () => {
+    if (authLoading) {
+      return
+    }
+    if (!user) {
+      setLoading(false)
+      return
+    }
 
-  const fetchAnalytics = async () => {
     try {
+      setErrorMessage('')
       // Fetch all completed sessions
-      const { data: sessions, error: sessionsError } = await supabase
-        .from('study_sessions')
-        .select('duration_minutes, started_at, completed')
-        .eq('user_id', user?.id)
-        .eq('completed', true)
-
-      if (sessionsError) throw sessionsError
+      const { sessions } = await apiRequest<{ sessions: CompletedStudySession[] }>(
+        '/study-sessions',
+      )
 
       // Fetch completed tasks
-      const { data: tasks, error: tasksError } = await supabase
-        .from('tasks')
-        .select('is_completed')
-        .eq('user_id', user?.id)
-        .eq('is_completed', true)
-
-      if (tasksError) throw tasksError
+      const { tasks } = await apiRequest<{ tasks: Task[] }>('/tasks?is_completed=true')
 
       // Calculate analytics
-      const totalSessions = sessions?.length || 0
+      const totalSessions = sessions.length
       const totalMinutes =
-        sessions?.reduce((sum, s) => sum + (s.duration_minutes || 0), 0) || 0
-      const completedTasks = tasks?.length || 0
+        sessions.reduce((sum, s) => sum + (s.duration_minutes || 0), 0)
+      const completedTasks = tasks.length
       const averageSessionLength = totalSessions > 0 ? Math.round(totalMinutes / totalSessions) : 0
 
       // Calculate this week's data
@@ -62,7 +66,7 @@ export default function Analytics() {
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 
       const thisWeekSessions =
-        sessions?.filter((s) => new Date(s.started_at) >= oneWeekAgo) || []
+        sessions.filter((s) => new Date(s.started_at) >= oneWeekAgo)
       const thisWeekMinutes = thisWeekSessions.reduce(
         (sum, s) => sum + (s.duration_minutes || 0),
         0
@@ -78,10 +82,15 @@ export default function Analytics() {
       })
     } catch (error) {
       console.error('Error fetching analytics:', error)
+      setErrorMessage(getApiErrorMessage(error, 'Unable to load analytics. Please try again.'))
     } finally {
       setLoading(false)
     }
-  }
+  }, [authLoading, user])
+
+  useEffect(() => {
+    void fetchAnalytics()
+  }, [fetchAnalytics])
 
   const formatHours = (minutes: number) => {
     const hours = Math.floor(minutes / 60)
@@ -104,6 +113,11 @@ export default function Analytics() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
+      {errorMessage && (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+          {errorMessage}
+        </div>
+      )}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">Your Study Analytics</h1>
         <p className="text-gray-600">Track your progress and stay motivated</p>

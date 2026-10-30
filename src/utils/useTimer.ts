@@ -5,13 +5,13 @@ export function useTimer(initialMinutes: number = 25) {
   const [isRunning, setIsRunning] = useState(false)
   const [isCompleted, setIsCompleted] = useState(false)
   const intervalRef = useRef<number | null>(null)
-  const wakeLockRef = useRef<any>(null)
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null)
 
   // Request wake lock to keep screen on
   const requestWakeLock = async () => {
     try {
       if ('wakeLock' in navigator) {
-        wakeLockRef.current = await (navigator as any).wakeLock.request('screen')
+        wakeLockRef.current = await navigator.wakeLock.request('screen')
         console.log('Wake Lock activated - screen will stay on')
       }
     } catch (err) {

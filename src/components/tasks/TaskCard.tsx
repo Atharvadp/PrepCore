@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from '../../lib/supabaseClient'
+import { apiRequest, getApiErrorMessage } from '../../lib/api'
 import type { Task } from '../../types'
 import { CheckCircle, Circle, Trash2, BookOpen } from 'lucide-react'
 import ConfirmDialog from '../layout/ConfirmDialog'
@@ -12,40 +12,53 @@ interface TaskCardProps {
 
 export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCardProps) {
   const [showConfirm, setShowConfirm] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const handleToggle = async () => {
-    const { error } = await supabase
-      .from('tasks')
-      .update({ is_completed: !task.is_completed })
-      .eq('id', task.id)
-
-    if (error) {
-      console.error('Error updating task:', error)
-    } else {
+    setError('')
+    setLoading(true)
+    try {
+      await apiRequest<{ task: Task }>(`/tasks/${encodeURIComponent(task.id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_completed: !task.is_completed }),
+      })
       onTaskUpdated()
+    } catch (requestError: unknown) {
+      setError(getApiErrorMessage(requestError, 'Unable to update task. Please try again.'))
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleDelete = async () => {
-    const { error } = await supabase
-      .from('tasks')
-      .delete()
-      .eq('id', task.id)
-
-    if (error) {
-      console.error('Error deleting task:', error)
-    } else {
+    setError('')
+    setLoading(true)
+    try {
+      await apiRequest<{ message: string }>(`/tasks/${encodeURIComponent(task.id)}`, {
+        method: 'DELETE',
+      })
       onTaskDeleted()
+    } catch (requestError: unknown) {
+      setError(getApiErrorMessage(requestError, 'Unable to delete task. Please try again.'))
+    } finally {
+      setLoading(false)
+      setShowConfirm(false)
     }
-    setShowConfirm(false)
   }
 
   return (
     <>
       <div className="bg-surface border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow animate-fadeIn">
         <div className="flex items-start gap-3">
+          {error && (
+            <p className="text-sm text-red-600" role="alert">
+              {error}
+            </p>
+          )}
           <button
             onClick={handleToggle}
+            disabled={loading}
             className="mt-0.5 text-primary hover:scale-110 transition-transform"
           >
             {task.is_completed ? <CheckCircle size={24} /> : <Circle size={24} />}
@@ -72,6 +85,7 @@ export default function TaskCard({ task, onTaskUpdated, onTaskDeleted }: TaskCar
 
           <button
             onClick={() => setShowConfirm(true)}
+            disabled={loading}
             className="text-red-500 hover:text-red-700 hover:scale-110 transition-all"
           >
             <Trash2 size={20} />

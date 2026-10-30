@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { askQuestion } from '../../lib/groqClient'
+import { askQuestion } from '../../lib/aiClient'
 import { X, Send, Bot, User, Loader } from 'lucide-react'
 
 interface Message {
@@ -37,7 +37,7 @@ export default function QnAModal({ onClose }: QnAModalProps) {
     try {
       const answer = await askQuestion(userMessage)
       setMessages((prev) => [...prev, { role: 'assistant', content: answer }])
-    } catch (error) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         {

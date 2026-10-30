@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '../../contexts/useAuth'
 import { LogOut, ListTodo, LayoutDashboard, BarChart3, Bot, Menu, X } from 'lucide-react'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -10,8 +10,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleLogout = async () => {
-    await signOut()
-    navigate('/login')
+    const { error } = await signOut()
+    navigate('/login', {
+      state: error ? { authError: error.message } : null,
+      replace: true,
+    })
   }
 
   const navItems = [

@@ -1,12 +1,20 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { useAuth } from '../../contexts/AuthContext'
+import { useLocation, useNavigate, Link } from 'react-router-dom'
+import { useAuth } from '../../contexts/useAuth'
 import { Mail, Lock, AlertCircle } from 'lucide-react'
 
 export default function Login() {
+  const location = useLocation()
+  const routeError =
+    typeof location.state === 'object' &&
+    location.state !== null &&
+    'authError' in location.state &&
+    typeof location.state.authError === 'string'
+      ? location.state.authError
+      : ''
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useState(routeError)
   const [loading, setLoading] = useState(false)
   const { signIn } = useAuth()
   const navigate = useNavigate()
@@ -16,13 +24,15 @@ export default function Login() {
     setError('')
     setLoading(true)
 
-    const { error } = await signIn(email, password)
-
-    if (error) {
-      setError(error.message)
+    try {
+      const { error: authError } = await signIn(email, password)
+      if (authError) {
+        setError(authError.message)
+      } else {
+        navigate('/dashboard')
+      }
+    } finally {
       setLoading(false)
-    } else {
-      navigate('/dashboard')
     }
   }
 
@@ -53,7 +63,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                className="w-full bg-white text-gray-900 placeholder-gray-400 pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                 placeholder="you@example.com"
               />
             </div>
@@ -70,7 +80,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                className="w-full bg-white text-gray-900 placeholder-gray-400 pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                 placeholder="••••••••"
               />
             </div>

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabaseClient'
-import { useAuth } from '../../contexts/AuthContext'
+import { useEffect, useState } from 'react'
+import { apiRequest } from '../../lib/api'
 import { CheckCircle, Clock, Target, Flame } from 'lucide-react'
+import type { Profile } from '../../types'
 
 interface SessionSummaryProps {
   duration: number
@@ -9,29 +9,29 @@ interface SessionSummaryProps {
   onClose: () => void
 }
 
+interface ProfileResponse {
+  profile: Pick<Profile, 'current_streak'>
+}
+
 export default function SessionSummary({
   duration,
   taskTitle,
   onClose,
 }: SessionSummaryProps) {
-  const { user } = useAuth()
   const [currentStreak, setCurrentStreak] = useState(0)
 
   useEffect(() => {
-    fetchStreak()
+    const controller = new AbortController()
+    void apiRequest<ProfileResponse>('/profile', { signal: controller.signal })
+      .then(({ profile }) => setCurrentStreak(profile.current_streak))
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          console.error('Error fetching streak:', error)
+        }
+      })
+
+    return () => controller.abort()
   }, [])
-
-  const fetchStreak = async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('current_streak')
-      .eq('id', user?.id)
-      .single()
-
-    if (data) {
-      setCurrentStreak(data.current_streak)
-    }
-  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

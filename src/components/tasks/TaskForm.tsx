@@ -1,16 +1,15 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { supabase } from '../../lib/supabaseClient'
-import { useAuth } from '../../contexts/AuthContext'
+import { apiRequest, getApiErrorMessage } from '../../lib/api'
+import type { Task } from '../../types'
 import { X, Plus, BookOpen } from 'lucide-react'
 
 interface TaskFormProps {
   onClose: () => void
-  onTaskCreated: () => void
+  onTaskCreated: () => Promise<void> | void
 }
 
 export default function TaskForm({ onClose, onTaskCreated }: TaskFormProps) {
-  const { user } = useAuth()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [subject, setSubject] = useState('')
@@ -23,22 +22,14 @@ export default function TaskForm({ onClose, onTaskCreated }: TaskFormProps) {
     setLoading(true)
 
     try {
-      const { error } = await supabase.from('tasks').insert([
-        {
-          user_id: user?.id,
-          title,
-          description,
-          subject,
-          is_completed: false,
-        },
-      ])
-
-      if (error) throw error
-
-      onTaskCreated()
+      await apiRequest<{ task: Task }>('/tasks', {
+        method: 'POST',
+        body: JSON.stringify({ title, description, subject }),
+      })
+      await onTaskCreated()
       onClose()
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Unable to create task. Please try again.'))
     } finally {
       setLoading(false)
     }

@@ -1,63 +1,67 @@
-# PrepCore - Distraction-First Study Companion 🎯
+# PrepCore - Distraction-First Study Companion
 
-A modern, full-stack study application built for students by a student. PrepCore helps students stay focused, organized, and motivated through deep work sessions, AI-powered assistance, and streak tracking.
+PrepCore helps students stay focused, organized, and motivated through study sessions, task management, progress tracking, and AI-powered study assistance.
 
-## ✨ Features
+## Features
 
-### 🎯 Core Features
-- **Focus Sessions**: Pomodoro-style timer with distraction-free interface
-- **Task Management**: Create, organize, and track study tasks
-- **AI Study Assistant**: Get instant answers to study questions (powered by Groq AI)
+- Focus sessions with selectable durations and task association
+- Task management
+- Daily study streaks and analytics
+- AI study assistance and Q&A
+- Responsive interface
 
-### 📊 Progress Tracking
-- **Streak System**: Daily study streak tracking with motivation
-- **Analytics Dashboard**: Visualize your study time, sessions, and progress
-- **Task Statistics**: Track completed tasks and subjects
+## Architecture
 
-### 🎨 User Experience
-- Clean, calm UI design to reduce distractions
-- Mobile-responsive layout with hamburger menu
-- Smooth animations and transitions
+- **Frontend:** React, TypeScript, and Vite
+- **Backend:** Node.js, Express, and TypeScript
+- **Database:** MongoDB accessed through Mongoose
+- **AI:** Groq requests are made by the backend using the server-only `GROQ_API_KEY`
+- **Authentication:** Backend-managed authentication using an HTTP-only cookie
 
-## 🛠️ Tech Stack
+The frontend communicates with the backend API. AI provider credentials are not configured in the browser.
 
-- **Frontend**: React 18, TypeScript, Vite
-- **Styling**: Tailwind CSS
-- **Backend**: Supabase (PostgreSQL, Auth, Real-time)
-- **AI**: Groq API (Llama 3.1 8B Instant)
-- **Icons**: Lucide React
-
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
-- Node.js 18+ installed
-- Supabase account
-- Groq API account
 
-### Installation
+- Node.js 18 or newer
+- A MongoDB deployment compatible with the backend's transaction requirements
+- A Groq API key to use the AI features
 
-1. Clone the repository
+### Install dependencies
 
-## 📝 License
+From the project root:
+
+```sh
+npm install
+npm --prefix server install
+```
+
+Configure the backend environment using `server/.env.example` as a reference. Set the required MongoDB and authentication settings. Set `GROQ_API_KEY` in the server environment to enable AI requests; do not use a `VITE_`-prefixed variable for the key.
+
+### Run the application
+
+Start the backend in one terminal:
+
+```sh
+npm run server:dev
+```
+
+Start the frontend in another terminal:
+
+```sh
+npm run dev
+```
+
+Build the frontend and backend with:
+
+```sh
+npm run build
+npm run server:build
+```
+
+See [`server/README.md`](./server/README.md) for backend configuration, API endpoints, and behavior.
+
+## License
 
 MIT
-
-## 👨‍💻 About
-
-Built by Atharva as a full-stack study companion app featuring:
-- Modern React & TypeScript architecture
-- Supabase backend integration
-- AI-powered features with Groq
-- Complete authentication & database management
-
-
-## 🙏 Acknowledgments
-
-- Groq for free AI API
-- Supabase for backend infrastructure
-- Tailwind CSS for beautiful styling
-
----
-
-**⭐ Star this repo if you find it helpful!**
-
